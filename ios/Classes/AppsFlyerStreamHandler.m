@@ -39,9 +39,11 @@
 - (void)onConversionDataFail:(NSError *)error {
     //use callbacks
     if([AppsflyerSdkPlugin gcdCallback]){
+        NSError *error;
+        NSString *installDataJson = [self mapToJson:@{} withError:error];
         NSDictionary *fullResponse = @{
             @"id": afGCDCallback,
-            @"data": error.localizedDescription,
+            @"data": installDataJson,
             @"status": afSuccess
         };
         NSString *JSONString = [self mapToJson:fullResponse withError:error];

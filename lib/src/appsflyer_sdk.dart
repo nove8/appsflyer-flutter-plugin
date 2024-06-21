@@ -72,7 +72,7 @@ class AppsflyerSdk {
           false;
     }
 
-    if (Platform.isIOS) {
+    if (_makeWebSafelyCheckIsIosPlatform()) {
       if (options.timeToWaitForATTUserAuthorization != null) {
         dynamic timeToWaitForATTUserAuthorization =
             options.timeToWaitForATTUserAuthorization;
@@ -95,6 +95,14 @@ class AppsflyerSdk {
         (options.showDebug != null) ? options.showDebug : false;
 
     return validatedOptions;
+  }
+
+  bool _makeWebSafelyCheckIsIosPlatform() {
+    if (kIsWeb) {
+      throw UnsupportedError('Web is not currently supported');
+    } else {
+      return Platform.isIOS;
+    }
   }
 
   /// Validates a map of option values, checking their types and presence.
@@ -132,7 +140,7 @@ class AppsflyerSdk {
       afOptions[AppsflyerConstants.DISABLE_ADVERTISING_IDENTIFIER] = false;
     }
 
-    if (Platform.isIOS) {
+    if (_makeWebSafelyCheckIsIosPlatform()) {
       if (options[
               AppsflyerConstants.AF_TIME_TO_WAIT_FOR_ATT_USER_AUTHORIZATION] !=
           null) {

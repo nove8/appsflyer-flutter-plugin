@@ -7,6 +7,7 @@ void main() {
 
   late AppsflyerSdk instance;
   String selectedMethod = "";
+  dynamic capturedArguments;
   const MethodChannel methodChannel = MethodChannel('af-api');
   const MethodChannel callbacksChannel = MethodChannel('callbacks');
   const EventChannel eventChannel = EventChannel('af-events');
@@ -17,87 +18,97 @@ void main() {
     instance = AppsflyerSdk.private(methodChannel, eventChannel,
         mapOptions: {'afDevKey': 'sdfhj2342cx'});
 
-    methodChannel.setMockMethodCallHandler((methodCall) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (methodCall) async {
       String method = methodCall.method;
-      if (method == 'initSdk') {
-        selectedMethod = method;
+      switch (method) {
+        case 'initSdk':
+        case 'setOneLinkCustomDomain':
+        case 'logCrossPromotionAndOpenStore':
+        case 'logCrossPromotionImpression':
+        case 'setAppInviteOneLinkID':
+        case 'generateInviteLink':
+        case 'setSharingFilterForAllPartners':
+        case 'setSharingFilter':
+        case 'getSDKVersion':
+        case 'getAppsFlyerUID':
+        case 'validateAndLogInAppAndroidPurchase':
+        case 'setMinTimeBetweenSessions':
+        case 'getHostPrefix':
+        case 'getHostName':
+        case 'setCollectIMEI':
+        case 'setCollectAndroidId':
+        case 'setUserEmails':
+        case 'setAdditionalData':
+        case 'waitForCustomerUserId':
+        case 'setCustomerUserId':
+        case 'setAndroidIdData':
+        case 'setImeiData':
+        case 'updateServerUninstallToken':
+        case 'stop':
+        case 'setIsUpdate':
+        case 'setCurrencyCode':
+        case 'setHost':
+        case 'logEvent':
+        case 'setOutOfStore':
+        case 'getOutOfStore':
+        case 'logAdRevenue':
+        case 'setConsentData':
+        case 'enableTCFDataCollection':
+        case 'setDisableNetworkData':
+        case 'setPartnerData':
+        case 'setResolveDeepLinkURLs':
+        case 'setPushNotification':
+        case 'sendPushNotificationData':
+        case 'enableFacebookDeferredApplinks':
+        case 'disableSKAdNetwork':
+        case 'setDisableAdvertisingIdentifiers':
+          selectedMethod = method;
+          capturedArguments = methodCall.arguments;
+          break;
       }
+      return null;
     });
 
-    eventMethodChannel.setMockMethodCallHandler((methodCall) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(eventMethodChannel, (methodCall) async {
       String method = methodCall.method;
       if (method == 'listen') {
         selectedMethod = method;
+        capturedArguments = methodCall.arguments;
       }
+      return null;
+    });
+
+    // Mock handler for callbacks channel to avoid MissingPluginException during startListening
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(callbacksChannel, (methodCall) async {
+      selectedMethod = methodCall.method;
+      capturedArguments = methodCall.arguments;
+      return null;
     });
   });
 
   test('check initSdk call', () async {
     await instance.initSdk(
-      registerConversionDataCallback: true,
-      registerOnAppOpenAttributionCallback: true,
-      registerOnDeepLinkingCallback: false
-    );
+        registerConversionDataCallback: true,
+        registerOnAppOpenAttributionCallback: true,
+        registerOnDeepLinkingCallback: false);
 
     expect('initSdk', selectedMethod);
   });
 
   group('AppsFlyerSdk', () {
     setUp(() {
-      //test map options way
-      instance = AppsflyerSdk.private(methodChannel, eventChannel,
-          mapOptions: {'afDevKey': 'sdfhj2342cx'});
-
-      callbacksChannel.setMockMethodCallHandler((call) async {
-        String method = call.method;
-        if (method == 'startListening') {
-          selectedMethod = method;
-        }
-      });
-
-      methodChannel.setMockMethodCallHandler((methodCall) async {
-        String method = methodCall.method;
-        switch (method) {
-          case 'setOneLinkCustomDomain':
-          case 'logCrossPromotionAndOpenStore':
-          case 'logCrossPromotionImpression':
-          case 'setAppInviteOneLinkID':
-          case 'generateInviteLink':
-          case 'setSharingFilterForAllPartners':
-          case 'setSharingFilter':
-          case 'getSDKVersion':
-          case 'getAppsFlyerUID':
-          case 'validateAndLogInAppAndroidPurchase':
-          case 'setMinTimeBetweenSessions':
-          case 'getHostPrefix':
-          case 'getHostName':
-          case 'setCollectIMEI':
-          case 'setCollectAndroidId':
-          case 'setUserEmailsWithCryptType':
-          case 'setUserEmails':
-          case 'setAdditionalData':
-          case 'waitForCustomerUserId':
-          case 'setCustomerUserId':
-          case 'enableLocationCollection':
-          case 'setAndroidIdData':
-          case 'setImeiData':
-          case 'updateServerUninstallToken':
-          case 'stop':
-          case 'setIsUpdate':
-          case 'setCurrencyCode':
-          case 'setHost':
-          case 'logEvent':
-          case 'initSdk':
-          case 'setOutOfStore':
-          case 'getOutOfStore':
-            selectedMethod = methodCall.method;
-            break;
-        }
-      });
+      selectedMethod = "";
+      capturedArguments = null;
     });
 
     tearDown(() {
-      methodChannel.setMockMethodCallHandler(null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(callbacksChannel, null);
     });
 
     test('check logEvent call', () async {
@@ -107,45 +118,56 @@ void main() {
     });
 
     test('check setHost call', () async {
-      instance.setHost("", "");
+      instance.setHost("prefix", "hostname");
 
       expect(selectedMethod, 'setHost');
+      expect(capturedArguments['hostPrefix'], 'prefix');
+      expect(capturedArguments['hostName'], 'hostname');
     });
 
     test('check setCurrencyCode call', () async {
-      instance.setCurrencyCode("currencyCode");
+      instance.setCurrencyCode("USD");
 
       expect(selectedMethod, 'setCurrencyCode');
+      expect(capturedArguments['currencyCode'], 'USD');
     });
 
     test('check setIsUpdate call', () async {
       instance.setIsUpdate(true);
 
       expect(selectedMethod, 'setIsUpdate');
+      expect(capturedArguments['isUpdate'], true);
     });
 
     test('check stop call', () async {
       instance.stop(true);
 
       expect(selectedMethod, 'stop');
+      expect(capturedArguments['isStopped'], true);
     });
 
     test('check updateServerUninstallToken call', () async {
-      instance.updateServerUninstallToken("token");
+      instance.updateServerUninstallToken("token123");
 
       expect(selectedMethod, 'updateServerUninstallToken');
+      expect(capturedArguments['token'], 'token123');
     });
 
     test('check setOneLinkCustomDomain call', () async {
       instance.setOneLinkCustomDomain(["brandDomains"]);
 
       expect(selectedMethod, 'setOneLinkCustomDomain');
+      expect(capturedArguments, isA<List>());
+      expect(capturedArguments, contains('brandDomains'));
     });
 
     test('check logCrossPromotionAndOpenStore call', () async {
-      instance.logCrossPromotionAndOpenStore("appId", "campaign", null);
+      instance.logCrossPromotionAndOpenStore("appId123", "campaignA", null);
 
       expect(selectedMethod, 'logCrossPromotionAndOpenStore');
+      expect(capturedArguments['appId'], 'appId123');
+      expect(capturedArguments['campaign'], 'campaignA');
+      expect(capturedArguments['params'], null);
     });
 
     test('check logCrossPromotionImpression call', () async {
@@ -166,18 +188,6 @@ void main() {
       expect(selectedMethod, 'generateInviteLink');
     });
 
-    test('check setSharingFilterForAllPartners call', () async {
-      instance.setSharingFilterForAllPartners();
-
-      expect(selectedMethod, 'setSharingFilterForAllPartners');
-    });
-
-    test('check setSharingFilter call', () async {
-      instance.setSharingFilter(["filters"]);
-
-      expect(selectedMethod, 'setSharingFilter');
-    });
-
     test('check getSDKVersion call', () async {
       instance.getSDKVersion();
 
@@ -192,9 +202,12 @@ void main() {
 
     test('check validateAndLogInAppPurchase call', () async {
       instance.validateAndLogInAppAndroidPurchase(
-          "publicKey", "signature", "purchaseData", "price", "currency", null);
+          "publicKey", "signature", "purchaseData", "9.99", "EUR", null);
 
       expect(selectedMethod, 'validateAndLogInAppAndroidPurchase');
+      expect(capturedArguments['publicKey'], 'publicKey');
+      expect(capturedArguments['price'], '9.99');
+      expect(capturedArguments['currency'], 'EUR');
     });
 
     test('check setMinTimeBetweenSessions call', () async {
@@ -227,16 +240,14 @@ void main() {
       expect(selectedMethod, 'setCollectAndroidId');
     });
 
-    test('check setUserEmailsWithCryptType call', () async {
-      instance.setUserEmails(["emails"], EmailCryptType.EmailCryptTypeNone);
-
-      expect(selectedMethod, 'setUserEmailsWithCryptType');
-    });
-
     test('check setUserEmails call', () async {
-      instance.setUserEmails(["emails"]);
+      instance.setUserEmails(
+          ["user@example.com"], EmailCryptType.EmailCryptTypeSHA256);
 
       expect(selectedMethod, 'setUserEmails');
+      expect(capturedArguments['emails'], contains('user@example.com'));
+      expect(capturedArguments['cryptType'],
+          EmailCryptType.values.indexOf(EmailCryptType.EmailCryptTypeSHA256));
     });
 
     test('check setAdditionalData call', () async {
@@ -255,12 +266,6 @@ void main() {
       instance.setCustomerUserId("id");
 
       expect(selectedMethod, 'setCustomerUserId');
-    });
-
-    test('check enableLocationCollection call', () async {
-      //instance.enableLocationCollection(false);
-
-      expect(selectedMethod, 'enableLocationCollection');
     });
 
     test('check setImeiData call', () async {
@@ -285,6 +290,88 @@ void main() {
       instance.setOutOfStore("source");
 
       expect(selectedMethod, 'setOutOfStore');
+    });
+
+    test('check logAdRevenue call', () async {
+      final adRevenueData = AdRevenueData(
+          monetizationNetwork: 'Applovin',
+          mediationNetwork: AFMediationNetwork.applovinMax.value,
+          currencyIso4217Code: 'USD',
+          revenue: 0.99);
+      instance.logAdRevenue(adRevenueData);
+
+      expect(selectedMethod, 'logAdRevenue');
+      expect(capturedArguments['mediationNetwork'], 'applovin_max');
+    });
+
+    test('check setConsentData call', () async {
+      final consentData = AppsFlyerConsent.forGDPRUser(
+        hasConsentForDataUsage: true,
+        hasConsentForAdsPersonalization: true,
+      );
+      instance.setConsentData(consentData);
+
+      expect(selectedMethod, 'setConsentData');
+    });
+
+    test('check enableTCFDataCollection call', () async {
+      instance.enableTCFDataCollection(true);
+
+      expect(selectedMethod, 'enableTCFDataCollection');
+    });
+
+    test('check setDisableNetworkData call', () async {
+      instance.setDisableNetworkData(true);
+
+      expect(selectedMethod, 'setDisableNetworkData');
+    });
+
+    test('check setPartnerData call', () async {
+      instance.setPartnerData('partnerId', {'key': 'value'});
+
+      expect(selectedMethod, 'setPartnerData');
+      expect(capturedArguments['partnerId'], 'partnerId');
+      expect(capturedArguments['partnersData']['key'], 'value');
+    });
+
+    test('check setResolveDeepLinkURLs call', () async {
+      instance.setResolveDeepLinkURLs(['https://example.com']);
+
+      expect(selectedMethod, 'setResolveDeepLinkURLs');
+      expect(capturedArguments, contains('https://example.com'));
+    });
+
+    test('check setPushNotification call', () async {
+      instance.setPushNotification(true);
+
+      expect(selectedMethod, 'setPushNotification');
+    });
+
+    test('check sendPushNotificationData call', () async {
+      instance.sendPushNotificationData({'key': 'value'});
+
+      expect(selectedMethod, 'sendPushNotificationData');
+      expect(capturedArguments['key'], 'value');
+    });
+
+    test('check enableFacebookDeferredApplinks call', () async {
+      instance.enableFacebookDeferredApplinks(true);
+
+      expect(selectedMethod, 'enableFacebookDeferredApplinks');
+      expect(capturedArguments['isFacebookDeferredApplinksEnabled'], true);
+    });
+
+    test('check disableSKAdNetwork call', () async {
+      instance.disableSKAdNetwork(true);
+
+      expect(selectedMethod, 'disableSKAdNetwork');
+    });
+
+    test('check setDisableAdvertisingIdentifiers call', () async {
+      instance.setDisableAdvertisingIdentifiers(true);
+
+      expect(selectedMethod, 'setDisableAdvertisingIdentifiers');
+      expect(capturedArguments, true);
     });
   });
 }

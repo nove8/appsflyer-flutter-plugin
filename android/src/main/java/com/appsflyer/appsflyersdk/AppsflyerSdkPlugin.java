@@ -11,9 +11,12 @@ import android.util.Log;
 
 import com.appsflyer.AFAdRevenueData;
 import com.appsflyer.AFLogger;
+import com.appsflyer.AFPurchaseDetails;
+import com.appsflyer.AFPurchaseType;
 import com.appsflyer.AppsFlyerConsent;
 import com.appsflyer.AppsFlyerConversionListener;
 import com.appsflyer.AppsFlyerInAppPurchaseValidatorListener;
+import com.appsflyer.AppsFlyerInAppPurchaseValidationCallback;
 import com.appsflyer.AppsFlyerLib;
 import com.appsflyer.AppsFlyerProperties;
 import com.appsflyer.MediationNetwork;
@@ -237,7 +240,7 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
                 break;
             case "setConsentDataV2":
                 setConsentDataV2(call, result);
-                break;    
+                break;        
             case "setIsUpdate":
                 setIsUpdate(call, result);
                 break;
@@ -285,6 +288,9 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
                 break;
             case "validateAndLogInAppAndroidPurchase":
                 validateAndLogInAppPurchase(call, result);
+                break;
+            case "validateAndLogInAppPurchaseV2":
+                validateAndLogInAppPurchaseV2(call, result);
                 break;
             case "getAppsFlyerUID":
                 getAppsFlyerUID(result);
@@ -355,6 +361,9 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
             case "logAdRevenue":
                 logAdRevenue(call, result);
                 break;
+            case "disableAppSetId":
+                disableAppSetId(call, result);
+                break;
             default:
                 result.notImplemented();
                 break;
@@ -390,27 +399,27 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
             appsFlyerLib.start(activity, null, new AppsFlyerRequestListener() {
                 @Override
                 public void onSuccess() {
-                    if (mMethodChannel != null) {
-                        uiThreadHandler.post(() -> mMethodChannel.invokeMethod("onSuccess", null));
-                    } else {
-                        Log.e(AF_PLUGIN_TAG, LogMessages.METHOD_CHANNEL_IS_NULL);
-                        result.error("NULL_OBJECT", LogMessages.METHOD_CHANNEL_IS_NULL, null);
-                    }
+                    uiThreadHandler.post(() -> {
+                        if (mMethodChannel != null) {
+                            mMethodChannel.invokeMethod("onSuccess", null);
+                        } else {
+                            Log.e(AF_PLUGIN_TAG, LogMessages.METHOD_CHANNEL_IS_NULL + " - SDK started successfully but callback `onSuccess` failed");
+                        }
+                    });
                 }
 
                 @Override
                 public void onError(final int errorCode, final String errorMessage) {
-                    if (mMethodChannel != null) {
-                        uiThreadHandler.post(() -> {
+                    uiThreadHandler.post(() -> {
+                        if (mMethodChannel != null) {
                             HashMap<String, Object> errorDetails = new HashMap<>();
                             errorDetails.put("errorCode", errorCode);
                             errorDetails.put("errorMessage", errorMessage);
                             mMethodChannel.invokeMethod("onError", errorDetails);
-                        });
-                    } else {
-                        Log.e(AF_PLUGIN_TAG, LogMessages.METHOD_CHANNEL_IS_NULL);
-                        result.error("NULL_OBJECT", LogMessages.METHOD_CHANNEL_IS_NULL, null);
-                    }
+                        } else {
+                            Log.e(AF_PLUGIN_TAG, LogMessages.METHOD_CHANNEL_IS_NULL + " - SDK failed to start: " + errorMessage);
+                        }
+                    });
                 }
             });
             result.success(null);
@@ -431,7 +440,7 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
 
     /**
      * Sets the user consent data for tracking.
-     * @deprecated Use {@link #setConsentDataV2(MethodCall, Result)} instead.
+     * @deprecated Use {@link #setConsentDataV2(MethodCall, Result)} instead!
      */
     @Deprecated
     public void setConsentData(MethodCall call, Result result) {
@@ -734,29 +743,33 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
                 new Runnable() {
                     @Override
                     public void run() {
-                        Log.d("Callbacks", "Calling invokeMethod with: " + data);
-                        JSONObject args = new JSONObject();
-                        try {
-                            args.put("id", callbackName);
-                            //return data for UDL
-                            if (callbackName.equals(AppsFlyerConstants.AF_UDL_CALLBACK)) {
-                                DeepLinkResult dp = (DeepLinkResult) data;
-                                args.put("deepLinkStatus", dp.getStatus().toString());
-                                if (dp.getError() != null) {
-                                    args.put("deepLinkError", dp.getError().toString());
+                        if (mCallbackChannel != null) {
+                            Log.d(AF_PLUGIN_TAG, "Calling invokeMethod with: " + data);
+                            JSONObject args = new JSONObject();
+                            try {
+                                args.put("id", callbackName);
+                                //return data for UDL
+                                if (callbackName.equals(AppsFlyerConstants.AF_UDL_CALLBACK)) {
+                                    DeepLinkResult dp = (DeepLinkResult) data;
+                                    args.put("deepLinkStatus", dp.getStatus().toString());
+                                    if (dp.getError() != null) {
+                                        args.put("deepLinkError", dp.getError().toString());
+                                    }
+                                    if (dp.getStatus() == DeepLinkResult.Status.FOUND) {
+                                        args.put("deepLinkObj", dp.getDeepLink().getClickEvent());
+                                    }
+                                } else { // return data for conversionData and OAOA
+                                    JSONObject dataJSON = (JSONObject) data;
+                                    args.put("status", status);
+                                    args.put("data", data.toString());
                                 }
-                                if (dp.getStatus() == DeepLinkResult.Status.FOUND) {
-                                    args.put("deepLinkObj", dp.getDeepLink().getClickEvent());
-                                }
-                            } else { // return data for conversionData and OAOA
-                                JSONObject dataJSON = (JSONObject) data;
-                                args.put("status", status);
-                                args.put("data", data.toString());
+                            } catch (JSONException e) {
+                                e.printStackTrace();
                             }
-                        } catch (JSONException e) {
-                            e.printStackTrace();
+                            mCallbackChannel.invokeMethod("callListener", args.toString());
+                        } else {
+                            Log.e(AF_PLUGIN_TAG, "CallbackChannel is null, cannot invoke method: " + callbackName);
                         }
-                        mCallbackChannel.invokeMethod("callListener", args.toString());
                     }
                 }
         );
@@ -787,6 +800,107 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
         AppsFlyerLib.getInstance().validateAndLogInAppPurchase(mContext, publicKey, signature, purchaseData, price,
                 currency, additionalParameters);
         result.success(null);
+    }
+
+    private void validateAndLogInAppPurchaseV2(MethodCall call, Result result) {
+        try {
+            // Get the complete purchase details map
+            Map<String, Object> purchaseDetailsMap = (Map<String, Object>) call.argument("purchaseDetails");
+            Map<String, String> additionalParameters = (Map<String, String>) call.argument("additionalParameters");
+
+            if (purchaseDetailsMap == null) {
+                result.error("INVALID_ARGUMENTS", "Purchase details cannot be null", null);
+                return;
+            }
+
+            if (additionalParameters == null) {
+                additionalParameters = new HashMap<>();
+            }
+
+            // Extract fields from purchase details map
+            String purchaseTypeString = (String) purchaseDetailsMap.get("purchaseType");
+            String purchaseToken = (String) purchaseDetailsMap.get("purchaseToken");
+            String productId = (String) purchaseDetailsMap.get("productId");
+
+            // Validate required fields
+            if (purchaseTypeString == null || purchaseToken == null || productId == null) {
+                result.error("INVALID_ARGUMENTS", "Purchase details must contain purchaseType, purchaseToken, and productId", null);
+                return;
+            }
+
+            // Map Dart enum values to Android AFPurchaseType enum
+            AFPurchaseType purchaseType = mapPurchaseType(purchaseTypeString);
+            if (purchaseType == null) {
+                result.error("INVALID_PURCHASE_TYPE", "Invalid purchase type: " + purchaseTypeString + ". Expected: 'subscription' or 'one_time_purchase'", null);
+                return;
+            }
+
+            // Create AFPurchaseDetails object
+            AFPurchaseDetails purchaseDetails = new AFPurchaseDetails(
+                purchaseType,
+                purchaseToken,
+                productId
+            );
+
+            Log.d(AF_PLUGIN_TAG, "validateAndLogInAppPurchaseV2 called with " + purchaseDetailsMap);
+            
+            AppsFlyerLib.getInstance().validateAndLogInAppPurchase(
+                purchaseDetails,
+                additionalParameters,
+                new AppsFlyerInAppPurchaseValidationCallback() {
+                    @Override
+                    public void onInAppPurchaseValidationFinished(@NonNull Map<String, ?> validationFinishedResult) {
+                        Log.d(AF_PLUGIN_TAG, "Purchase validation V2 response arrived");
+                        
+                        // Convert the result to a format Flutter can understand
+                        Map<String, Object> flutterResult = new HashMap<>();
+                        for (Map.Entry<String, ?> entry : validationFinishedResult.entrySet()) {
+                            flutterResult.put(entry.getKey(), entry.getValue());
+                        }
+                        
+                        result.success(flutterResult);
+                    }
+
+                    @Override
+                    public void onInAppPurchaseValidationError(@NonNull Map<String, ?> validationErrorResult) {
+                        Log.d(AF_PLUGIN_TAG, "Purchase validation V2 returned error");
+                        
+                        String errorMessage = "Purchase validation failed";
+                        if (validationErrorResult.containsKey("error_message")) {
+                            errorMessage = (String) validationErrorResult.get("error_message");
+                        }
+                        
+                        // Convert error result to Flutter format
+                        Map<String, Object> flutterErrorResult = new HashMap<>();
+                        for (Map.Entry<String, ?> entry : validationErrorResult.entrySet()) {
+                            flutterErrorResult.put(entry.getKey(), entry.getValue());
+                        }
+                        
+                        result.error("VALIDATION_ERROR", errorMessage, flutterErrorResult);
+                    }
+                }
+            );
+            
+        } catch (Exception e) {
+            Log.e(AF_PLUGIN_TAG, "Error in validateAndLogInAppPurchaseV2: " + e.getMessage(), e);
+            result.error("VALIDATION_ERROR", "Purchase validation failed: " + e.getMessage(), null);
+        }
+    }
+
+    /**
+     * Maps Dart enum string to Android AFPurchaseType enum.
+     * @param purchaseTypeString The string representation from Dart
+     * @return AFPurchaseType enum or null if invalid
+     */
+    private AFPurchaseType mapPurchaseType(String purchaseTypeString) {
+        switch (purchaseTypeString) {
+            case "subscription":
+                return AFPurchaseType.SUBSCRIPTION;
+            case "one_time_purchase":
+                return AFPurchaseType.ONE_TIME_PURCHASE;
+            default:
+                return null;
+        }
     }
 
     private void registerValidatorListener() {
@@ -941,7 +1055,9 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
 
         String afDevKey = (String) call.argument(AppsFlyerConstants.AF_DEV_KEY);
         if (afDevKey == null || afDevKey.equals("")) {
-            result.error(null, "AF Dev Key is empty", "AF dev key cannot be empty");
+            Log.e(AF_PLUGIN_TAG, LogMessages.AF_DEV_KEY_IS_EMPTY);
+            result.error("INIT_ERROR", LogMessages.AF_DEV_KEY_IS_EMPTY, null);
+            return;
         }
 
         boolean advertiserIdDisabled = (boolean) call.argument(AppsFlyerConstants.DISABLE_ADVERTISING_IDENTIFIER);
@@ -1102,10 +1218,15 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
         return newMap;
     }
 
+    private void disableAppSetId(MethodCall call, Result result) {
+        AppsFlyerLib.getInstance().disableAppSetId();
+        result.success(null);
+    }
 
     @Override
     public void onAttachedToEngine(FlutterPluginBinding binding) {
         onAttachedToEngine(binding.getApplicationContext(), binding.getBinaryMessenger());
+        AppsFlyerPurchaseConnector.INSTANCE.onAttachedToEngine(binding);
     }
 
     @Override
@@ -1114,6 +1235,7 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
         mMethodChannel = null;
         mEventChannel.setStreamHandler(null);
         mEventChannel = null;
+        AppsFlyerPurchaseConnector.INSTANCE.onDetachedFromEngine(binding);
         mContext = null;
         mApplication = null;
     }
@@ -1143,4 +1265,5 @@ public class AppsflyerSdkPlugin implements MethodCallHandler, FlutterPlugin, Act
         saveCallbacks = true;
         AppsFlyerLib.getInstance().unregisterConversionListener();
     }
+
 }

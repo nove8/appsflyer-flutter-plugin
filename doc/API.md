@@ -6,6 +6,8 @@
 - [AppsFlyerOptions](#appsflyer-options)
 - [AdRevenueData](#AdRevenueData)
 - [AFMediationNetwork](#AFMediationNetwork)
+- [AFPurchaseDetails](#AFPurchaseDetails)
+- [AFPurchaseType](#AFPurchaseType)
 
 ## Methods
 - [initSdk](#initSdk)
@@ -35,6 +37,7 @@
 - [getHostPrefix](#getHostPrefix)
 - [updateServerUninstallToken](#updateServerUninstallToken)
 - [Validate Purchase](#validatePurchase)
+- [validateAndLogInAppPurchaseV2](#validatePurchaseV2)
 - [sendPushNotificationData](#sendPushNotificationData)
 - [addPushNotificationDeepLinkPath](#addPushNotificationDeepLinkPath)
 - [User Invite](#userInvite)
@@ -53,6 +56,7 @@
 - [setOutOfStore](#setOutOfStore)
 - [getOutOfStore](#getOutOfStore)
 - [setDisableNetworkData](#setDisableNetworkData)
+- [disableAppSetId](#disableAppSetId)
 - [performOnDeepLinking](#performondeeplinking)
 - [logAdRevenue](#logAdRevenue)  - Since 6.15.1
 
@@ -224,7 +228,7 @@ _Example:_
 
 | parameter     | type     | description                                                                                                                                                                       |
 | ------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `eventName`   | `String` | custom event name, is presented in your dashboard. See the Event list [HERE](https://github.com/AppsFlyerSDK/cordova-plugin-appsflyer-sdk/blob/master/src/ios/AppsFlyerTracker.h) |
+| `eventName`   | `String` | Use descriptive, action-based names (e.g., "purchase", "add_to_cart", "level_completed"), keep names concise but meaningful, use lowercase with underscores for consistency and avoid special characters and spaces. See the [recommended event list by business](https://support.appsflyer.com/hc/en-us/articles/115005544169-In-app-events-Overview#recommended-events-by-business-vertical). |
 | `eventValues` | `Map`    | event details                                                                                                                                                                     |
 
 _Example:_
@@ -510,6 +514,54 @@ appsFlyerSdk.updateServerUninstallToken("token");
 ---
 **<a id="validatePurchase"> Validate Purchase**
 
+***Cross-Platform V2 API (Recommended - BETA):***
+
+> ⚠️ **BETA Feature**: This API is currently in beta. While it's stable and recommended for new implementations, please test thoroughly in your environment before production use.
+
+**`Future<Map<String, dynamic>> validateAndLogInAppPurchaseV2(AFPurchaseDetails purchaseDetails, {Map<String, String>? additionalParameters})`**
+
+The new unified purchase validation API that works across both Android and iOS platforms. This is the recommended approach for validating in-app purchases.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `purchaseDetails` | `AFPurchaseDetails` | Purchase details containing type, token, and product ID |
+| `additionalParameters` | `Map<String, String>?` | Optional additional parameters |
+
+**AFPurchaseDetails:**
+| Property | Type | Description |
+|----------|------|-------------|
+| `purchaseType` | `AFPurchaseType` | Type of purchase (oneTimePurchase or subscription) |
+| `purchaseToken` | `String` | Purchase token from the app store |
+| `productId` | `String` | Product identifier |
+
+**AFPurchaseType:**
+- `AFPurchaseType.oneTimePurchase` - For one-time in-app purchases
+- `AFPurchaseType.subscription` - For subscription purchases
+
+_Example:_
+```dart
+// Create purchase details
+AFPurchaseDetails purchaseDetails = AFPurchaseDetails(
+  purchaseType: AFPurchaseType.oneTimePurchase,
+  purchaseToken: "your_purchase_token",
+  productId: "your_product_id",
+);
+
+// Validate purchase
+try {
+  Map<String, dynamic> result = await appsFlyerSdk.validateAndLogInAppPurchaseV2(
+    purchaseDetails,
+    additionalParameters: {"custom_param": "value"}
+  );
+  print("Validation successful: $result");
+} catch (e) {
+  print("Validation failed: $e");
+}
+```
+
+---
+
+***Legacy APIs:***
 
 ***Android:***
 
@@ -572,29 +624,100 @@ appsflyerSdk.onPurchaseValidation((res){
 ```
 
 ---
+
+##### <a id="validatePurchaseV2"> **validateAndLogInAppPurchaseV2 (Recommended - BETA)**
+
+> ⚠️ **BETA Feature**: This API is currently in beta. While it's stable and recommended for new implementations, please test thoroughly in your environment before production use.
+
+**`Future<Map<String, dynamic>> validateAndLogInAppPurchaseV2(AFPurchaseDetails purchaseDetails, {Map<String, String>? additionalParameters})`**
+
+The unified cross-platform purchase validation API introduced in SDK v6.17.3. This is the recommended approach for validating in-app purchases as it provides a consistent interface across Android and iOS.
+
+|| parameter | type  | description |
+|| --------- | ----- | ----------- |
+|| `purchaseDetails` | `AFPurchaseDetails` | Purchase details object containing purchase type, token, and product ID |
+|| `additionalParameters` | `Map<String, String>?` | Optional additional parameters to send with the validation request |
+
+**Returns:** `Future<Map<String, dynamic>>` - Validation result with detailed response information
+
+**AFPurchaseDetails Properties:**
+
+|| property | type  | description |
+|| -------- | ----- | ----------- |
+|| `purchaseType` | `AFPurchaseType` | Type of purchase (`AFPurchaseType.oneTimePurchase` or `AFPurchaseType.subscription`) |
+|| `purchaseToken` | `String` | Purchase token obtained from the app store |
+|| `productId` | `String` | Product identifier of the purchased item |
+
+_Example:_
+
+```dart
+// Create purchase details
+AFPurchaseDetails purchaseDetails = AFPurchaseDetails(
+  purchaseType: AFPurchaseType.subscription,
+  purchaseToken: "your_purchase_token_from_store",
+  productId: "premium_subscription_monthly",
+);
+
+// Validate the purchase
+try {
+  Map<String, dynamic> validationResult = await appsflyerSdk.validateAndLogInAppPurchaseV2(
+    purchaseDetails,
+    additionalParameters: {
+      "app_version": "1.2.0",
+      "validation_source": "flutter_example"
+    }
+  );
+  
+  print("✅ Purchase validation successful!");
+  print("Validation result: $validationResult");
+  
+} catch (e) {
+  print("❌ Purchase validation failed: $e");
+  // Handle validation error
+}
+```
+
+**Key Benefits:**
+- **Cross-platform compatibility**: Works on both Android and iOS with the same API
+- **Type safety**: Uses structured data classes instead of platform-specific parameters  
+- **Enhanced error handling**: Provides detailed error information in structured format
+- **Future-proof**: Built on AppsFlyer's latest V2 validation infrastructure
+- **Automatic routing**: Automatically routes to correct validation endpoints based on purchase type
+
+---
 ## **<a id="sendPushNotificationData"> `void sendPushNotificationData(Map? userInfo)`**
 
-Push-notification campaigns are used to create re-engagements with existing users -> [Learn more here](https://support.appsflyer.com/hc/en-us/articles/207364076-Measuring-Push-Notification-Re-Engagement-Campaigns)
+Push-notification campaigns are used to create re-engagements with existing users → [Learn more here](https://support.appsflyer.com/hc/en-us/articles/207364076-Measuring-Push-Notification-Re-Engagement-Campaigns)
 
-🟩 **Android:**</br>
-The AppsFlyer SDK **requires a** **valid Activity context** to process the push payload.
-**Do NOT call this method from the background isolate** (e.g., _firebaseMessagingBackgroundHandler), as the activity is not yet created.
+### Platform-Specific Requirements
+
+🟩 **Android:**  
+The AppsFlyer SDK **requires a valid Activity context** to process the push payload.
+**Do NOT call this method from the background isolate** (e.g., `_firebaseMessagingBackgroundHandler`), as the activity is not yet created.
 Instead, **delay calling this method** until the Flutter app is fully resumed and the activity is alive.
 
-🍎 **iOS:**</br>
+🍎 **iOS:**  
 This method can be safely called at any point during app launch or when receiving a push notification.
 
+---
 
-_**Usage example with Firebase Cloud Messaging:**_</br>
-Given the fact that push message data contains custom key called `af` that contains the attribution data you want to send to AppsFlyer in JSON format. The following attribution parameters are required: `pid`, `is_retargeting`, `c`.
+## Integration Approaches
 
-📦 **Example Push Message Payload**
+AppsFlyer supports two approaches for measuring push notification campaigns:
+
+### Approach 1: Traditional Attribution Parameters (`af` object)
+
+Use this approach when your push payload contains a custom `af` object with attribution parameters.
+
+**Required parameters:** `pid`, `is_retargeting`, `c`
+
+📦 **Example Push Payload with `af` Object:**
 ```json
 {
- "af": {
+  "af": {
     "c": "test_campaign",
     "is_retargeting": true,
-    "pid": "push_provider_int",
+    "pid": "push_provider_int"
   },
   "aps": {
     "alert": "Get 5000 Coins",
@@ -604,21 +727,21 @@ Given the fact that push message data contains custom key called `af` that conta
 }
 ```
 
-1️⃣ Handle Foreground Messages
+**Implementation (Android & iOS):**
+
 ```dart
+// 1️⃣ Handle Foreground Messages
 FirebaseMessaging.onMessage.listen((RemoteMessage message) {
   appsFlyerSdk.sendPushNotificationData(message.data);
 });
-```
-2️⃣ Handle Notification Taps (App in Background)
-```dart
+
+// 2️⃣ Handle Notification Taps (App in Background)
 FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
   appsFlyerSdk.sendPushNotificationData(message.data);
 });
-```
-3️⃣ Handle App Launch from Push (Terminated State)
-Store the payload using `_firebaseMessagingBackgroundHandler`, then pass it to AppsFlyer once the app is resumed.
-```dart
+
+// 3️⃣ Handle App Launch from Push (Terminated State)
+// Store payload in background handler, then pass to AppsFlyer when app resumes
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString('pending_af_push', jsonEncode(message.data));
@@ -635,7 +758,136 @@ void handlePendingPush() async {
   }
 }
 ```
-Call handlePendingPush() during app startup (e.g., in your main() or inside your splash screen after ensuring Flutter is initialized).
+
+Call `handlePendingPush()` during app startup (e.g., in your `main()` or inside your splash screen after ensuring Flutter is initialized).
+
+---
+
+### Approach 2: OneLink URL in Push Payload (Recommended)
+
+Use this approach when your push payload contains a **OneLink URL** for deep linking. This method provides a unified deep linking experience.
+
+> ⚠️ **Important:** This approach requires calling **two different methods** depending on the platform!
+
+#### **Step 1: Configure Deep Link Path (BOTH Platforms)**
+
+Call `addPushNotificationDeepLinkPath` **BEFORE** initializing the SDK to tell AppsFlyer where to find the OneLink URL in your push payload.
+
+```dart
+// Must be called BEFORE initSdk() or startSDK()
+appsFlyerSdk.addPushNotificationDeepLinkPath(["deeply", "nested", "deep_link"]);
+
+// Then initialize the SDK
+await appsFlyerSdk.initSdk(
+  registerOnDeepLinkingCallback: true  // Enable deep linking callback
+);
+```
+
+#### **Step 2: Send Push Payload to SDK**
+
+**🟩 Android:**  
+On Android, calling `addPushNotificationDeepLinkPath` is **sufficient**. The SDK automatically extracts and processes the OneLink URL.
+
+**🍎 iOS:**  
+On iOS, you **MUST also call** `sendPushNotificationData(userInfo)` to pass the push payload to the SDK. The SDK then internally calls `handlePushNotification` to extract and process the OneLink URL.
+
+📦 **Example Push Payload with OneLink URL:**
+```json
+{
+  "deeply": {
+    "nested": {
+      "deep_link": "https://yourapp.onelink.me/ABC/campaign123"
+    }
+  },
+  "aps": {
+    "alert": "Check out our new feature!",
+    "badge": "1",
+    "sound": "default"
+  }
+}
+```
+
+**Complete Implementation Example:**
+
+```dart
+// ========================================
+// 1. Configure SDK (in main.dart or app initialization)
+// ========================================
+void initializeAppsFlyer() async {
+  // STEP 1: Configure the deep link path BEFORE starting SDK
+  appsFlyerSdk.addPushNotificationDeepLinkPath(["deeply", "nested", "deep_link"]);
+  
+  // STEP 2: Initialize SDK with deep linking callback
+  await appsFlyerSdk.initSdk(
+    registerOnDeepLinkingCallback: true
+  );
+  
+  // STEP 3: Set up deep linking callback to handle the OneLink URL
+  appsFlyerSdk.onDeepLinking((DeepLinkResult result) {
+    if (result.status == Status.FOUND) {
+      print("Deep link found: ${result.deepLink?.deepLinkValue}");
+      // Handle deep link navigation here
+    }
+  });
+}
+
+// ========================================
+// 2. Handle Push Notifications
+// ========================================
+
+// 🍎 iOS: MUST call sendPushNotificationData
+// 🟩 Android: Optional (SDK auto-handles), but recommended for consistency
+
+// 1️⃣ Foreground Messages
+FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+  // iOS: Required to process OneLink URL
+  // Android: SDK processes automatically, but calling doesn't hurt
+  appsFlyerSdk.sendPushNotificationData(message.data);
+});
+
+// 2️⃣ Background Notification Taps (App in Background)
+FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+  // iOS: Required to process OneLink URL
+  appsFlyerSdk.sendPushNotificationData(message.data);
+});
+
+// 3️⃣ App Launch from Push (Terminated State)
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('pending_af_push', jsonEncode(message.data));
+}
+
+// In main() or splash screen:
+void handlePendingPush() async {
+  final prefs = await SharedPreferences.getInstance();
+  final json = prefs.getString('pending_af_push');
+  if (json != null) {
+    final payload = jsonDecode(json);
+    // iOS: Required to process OneLink URL from terminated state
+    appsFlyerSdk.sendPushNotificationData(payload);
+    await prefs.remove('pending_af_push');
+  }
+}
+```
+
+#### **Key Differences Between Approaches:**
+
+|| Traditional `af` Object | OneLink URL (Recommended) |
+|---|---|---|
+| **Android** | `sendPushNotificationData(data)` | `addPushNotificationDeepLinkPath()` (auto-handles) |
+| **iOS** | `sendPushNotificationData(data)` | `addPushNotificationDeepLinkPath()` **+** `sendPushNotificationData(data)` |
+| **Deep Linking** | Basic attribution only | Full deep linking with `onDeepLinking` callback |
+| **Use Case** | Simple re-engagement | Re-engagement + in-app navigation |
+
+---
+
+### Summary
+
+- **Traditional approach**: Always call `sendPushNotificationData(payload)` on both platforms
+- **OneLink approach (Recommended)**:
+  - ✅ **Both platforms**: Call `addPushNotificationDeepLinkPath()` before SDK init
+  - ✅ **iOS only**: Also call `sendPushNotificationData(payload)` when push is received
+  - ✅ **Both platforms**: Handle deep links in `onDeepLinking` callback
 
     
 ---
@@ -858,6 +1110,19 @@ _Example:_
 ```dart
   if(Platform.isAndroid){
     appsflyerSdk.setDisableNetworkData(true);
+  }
+```
+---
+**<a id="disableAppSetId"> `void disableAppSetId()`**
+
+**Android Only!**
+
+Disables AppSet ID collection. Starting with v6.17.0, the SDK can automatically collect the AppSet ID. Use this method to opt-out of AppSet ID collection for privacy compliance.
+
+_Example:_
+```dart
+  if(Platform.isAndroid){
+    appsflyerSdk.disableAppSetId();
   }
 ```
 ---

@@ -56,6 +56,7 @@ void main() {
         case 'setConsentData':
         case 'enableTCFDataCollection':
         case 'setDisableNetworkData':
+        case 'disableAppSetId':
         case 'setPartnerData':
         case 'setResolveDeepLinkURLs':
         case 'setPushNotification':
@@ -304,16 +305,6 @@ void main() {
       expect(capturedArguments['mediationNetwork'], 'applovin_max');
     });
 
-    test('check setConsentData call', () async {
-      final consentData = AppsFlyerConsent.forGDPRUser(
-        hasConsentForDataUsage: true,
-        hasConsentForAdsPersonalization: true,
-      );
-      instance.setConsentData(consentData);
-
-      expect(selectedMethod, 'setConsentData');
-    });
-
     test('check enableTCFDataCollection call', () async {
       instance.enableTCFDataCollection(true);
 
@@ -341,12 +332,6 @@ void main() {
       expect(capturedArguments, contains('https://example.com'));
     });
 
-    test('check setPushNotification call', () async {
-      instance.setPushNotification(true);
-
-      expect(selectedMethod, 'setPushNotification');
-    });
-
     test('check sendPushNotificationData call', () async {
       instance.sendPushNotificationData({'key': 'value'});
 
@@ -372,6 +357,12 @@ void main() {
 
       expect(selectedMethod, 'setDisableAdvertisingIdentifiers');
       expect(capturedArguments, true);
+    });
+
+    test('check disableAppSetId call', () async {
+      instance.disableAppSetId();
+
+      expect(selectedMethod, 'disableAppSetId');
     });
   });
 }

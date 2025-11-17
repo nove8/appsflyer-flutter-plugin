@@ -1,6 +1,7 @@
 part of appsflyer_sdk;
 
 class AppsflyerSdk {
+  // ignore: unused_field
   EventChannel _eventChannel;
   static AppsflyerSdk? _instance;
   final MethodChannel _methodChannel;
@@ -9,8 +10,8 @@ class AppsflyerSdk {
   AppsFlyerOptions? afOptions;
   Map? mapOptions;
 
-  ///Returns the [AppsflyerSdk] instance, initialized with a custom options
-  ///provided by the user
+  /// Returns the [AppsflyerSdk] instance, initialized with a custom options
+  /// provided by the user
   factory AppsflyerSdk(options) {
     if (_instance == null) {
       MethodChannel methodChannel =
@@ -438,6 +439,26 @@ class AppsflyerSdk {
     });
   }
 
+  /// Validates and logs in-app purchases using the new AppsFlyer validation API (V2).
+  /// This method validates a purchase using the [AFPurchaseDetails] object.
+  ///
+  /// [purchaseDetails] - The purchase details containing type, token, and product ID
+  /// [additionalParameters] - Optional additional parameters to send with the validation request
+  ///
+  /// Returns a Future that completes with the validation result or throws an error if validation fails.
+  Future<Map<String, dynamic>> validateAndLogInAppPurchaseV2(
+      AFPurchaseDetails purchaseDetails,
+      {Map<String, String>? additionalParameters}) async {
+    final arguments = {
+      'purchaseDetails': purchaseDetails.toMap(),
+      'additionalParameters': additionalParameters,
+    };
+
+    final result = await _methodChannel.invokeMethod(
+        "validateAndLogInAppPurchaseV2", arguments);
+    return Map<String, dynamic>.from(result);
+  }
+
   /// set sandbox for iOS purchase validation
   void useReceiptValidationSandbox(bool isSandboxEnabled) {
     _methodChannel.invokeMethod(
@@ -611,6 +632,13 @@ class AppsflyerSdk {
   /// Disables transfer of user-specific data over the network.
   void setDisableNetworkData(bool disable) {
     _methodChannel.invokeMethod("setDisableNetworkData", disable);
+  }
+
+  /// Disables AppSet ID collection (Android only).
+  /// Starting with v6.17.0, the SDK can automatically collect the AppSet ID.
+  /// Use this method to opt-out of AppSet ID collection.
+  void disableAppSetId() {
+    _methodChannel.invokeMethod("disableAppSetId");
   }
 
   /// Retrieves the current plugin version.

@@ -20,6 +20,7 @@ You can read more about iOS Uninstall Measurement in our [knowledge base](https:
 You can register the uninstall token with AppsFlyer by modifying your `AppDelegate.m` file, add the following function call with your uninstall token inside [didRegisterForRemoteNotificationsWithDeviceToken](https://developer.apple.com/reference/uikit/uiapplicationdelegate).
 
 **Example:**
+
 ```objective-c
 @import AppsFlyerLib;
 
@@ -59,6 +60,7 @@ A complete list of supported parameters is available [here](https://support.apps
   **`Future<void> setAppInviteOneLinkID(String oneLinkID, Function callback)`**
 
 2. Utilize the AppsFlyerInviteLinkParams class to set the query params in the user invite link:
+
 ```dart
 class AppsFlyerInviteLinkParams {
   final String channel;
@@ -75,6 +77,7 @@ class AppsFlyerInviteLinkParams {
 3. Call the generateInviteLink API to generate the user invite link. Use the success and error callbacks for handling.
 
 **Full example:**
+
 ```dart
 // Setting the OneLinkID
 appsFlyerSdk.setAppInviteOneLinkID('OnelinkID', 
@@ -111,7 +114,58 @@ appsFlyerSdk.generateInviteLink(inviteLinkParams,
 Receipt validation is a secure mechanism whereby the payment platform (e.g. Apple or Google) validates that an in-app purchase indeed occurred as reported.<br>
 Learn more - https://support.appsflyer.com/hc/en-us/articles/207032106-Receipt-validation-for-in-app-purchases<br>
 
-There are two different functions, one for iOS and one for Android:
+**Cross-Platform V2 API (Recommended - SDK v6.17.3+) - BETA:**
+
+> ⚠️ **BETA Feature**: This API is currently in beta. While it's stable and recommended for new implementations, please test thoroughly in your environment before production use.
+
+The new unified purchase validation API that works across both Android and iOS platforms:
+
+```dart
+Future<Map<String, dynamic>> validateAndLogInAppPurchaseV2(
+      AFPurchaseDetails purchaseDetails,
+      {Map<String, String>? additionalParameters})
+```
+
+**AFPurchaseDetails class:**
+```dart
+AFPurchaseDetails(
+  purchaseType: AFPurchaseType,    // oneTimePurchase or subscription
+  purchaseToken: String,           // Purchase token from app store
+  productId: String,               // Product identifier
+)
+```
+
+Example:
+```dart
+// Create purchase details
+AFPurchaseDetails purchaseDetails = AFPurchaseDetails(
+  purchaseType: AFPurchaseType.oneTimePurchase,
+  purchaseToken: "sample_purchase_token_12345",
+  productId: "com.example.product",
+);
+
+// Validate purchase (works on both Android and iOS)
+try {
+  Map<String, dynamic> result = await appsFlyerSdk.validateAndLogInAppPurchaseV2(
+    purchaseDetails,
+    additionalParameters: {"custom_param": "value"}
+  );
+  print("Validation successful: $result");
+} catch (e) {
+  print("Validation failed: $e");
+}
+```
+
+**Benefits of V2 API:**
+- ✅ **Cross-platform**: Single API works on both Android and iOS
+- ✅ **Type-safe**: Uses structured data classes instead of raw strings
+- ✅ **Better error handling**: Returns structured error information
+- ✅ **Enhanced validation**: Uses AppsFlyer's latest validation infrastructure
+- ✅ **Future-proof**: Built for AppsFlyer's V2 validation endpoints
+
+---
+
+**Legacy Platform-Specific APIs:**
 
 **Android:**
 ```dart

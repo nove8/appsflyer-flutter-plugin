@@ -906,9 +906,20 @@ static BOOL _isSKADEnabled = false;
 
 
 + (FlutterViewController*) getViewController{
-    UIViewController *topMostViewControllerObj =  [[[UIApplication sharedApplication] delegate] window].rootViewController;
+    UIWindow *window = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive) {
+                window = scene.windows.firstObject;
+                break;
+            }
+        }
+    }
+    if (window == nil) {
+        window = [[[UIApplication sharedApplication] delegate] window];
+    }
+    UIViewController *topMostViewControllerObj = window.rootViewController;
     FlutterViewController *flutterViewController = (FlutterViewController *)topMostViewControllerObj;
-    
     return flutterViewController;
 }
 

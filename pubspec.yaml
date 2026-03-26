@@ -6,7 +6,7 @@ homepage: https://github.com/AppsFlyerSDK/flutter_appsflyer_sdk
 
 environment:
   sdk: '>=2.17.0 <4.0.0'
-  flutter: ">=3.38.0"
+  flutter: ">=1.10.0"
 
 dependencies:
   flutter:

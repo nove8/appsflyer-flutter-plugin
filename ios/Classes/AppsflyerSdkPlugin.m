@@ -68,7 +68,11 @@ static BOOL _isSKADEnabled = false;
     [registrar addMethodCallDelegate:instance channel:channel];
     [registrar addMethodCallDelegate:instance channel:callbackChannel];
     [registrar addApplicationDelegate:instance];
-    
+#if __has_include(<Flutter/FlutterSceneLifeCycleDelegate.h>)
+    if (@available(iOS 13.0, *)) {
+        [registrar addSceneDelegate:instance];
+    }
+#endif
 
 }
 
@@ -638,87 +642,56 @@ static BOOL _isSKADEnabled = false;
     result(nil);
 }
 
-- (void)validateAndLogInAppPurchaseV2:(FlutterMethodCall*)call result:(FlutterResult)result{
-    @try {
-        // Extract purchase details map from Flutter
-        NSDictionary* purchaseDetailsMap = call.arguments[@"purchaseDetails"];
-        NSDictionary* additionalParameters = call.arguments[@"additionalParameters"];
-        
-        if (purchaseDetailsMap == nil) {
-            result([FlutterError errorWithCode:@"INVALID_ARGUMENTS"
-                                       message:@"Purchase details cannot be null"
-                                       details:nil]);
-            return;
-        }
-        
-        // Extract individual fields from purchase details map
-        NSString* purchaseTypeString = purchaseDetailsMap[@"purchaseType"];
-        NSString* purchaseToken = purchaseDetailsMap[@"purchaseToken"];
-        NSString* productId = purchaseDetailsMap[@"productId"];
-        
-        // Validate required fields
-        if (purchaseTypeString == nil || purchaseToken == nil || productId == nil) {
-            result([FlutterError errorWithCode:@"INVALID_ARGUMENTS"
-                                       message:@"Purchase details must contain purchaseType, purchaseToken, and productId"
-                                       details:nil]);
-            return;
-        }
-        
-        // Map Dart enum values to iOS purchase type
-        // For iOS, we use transactionId instead of purchaseToken, so we'll use purchaseToken as transactionId
-        NSString* transactionId = purchaseToken;
-        
-        NSLog(@"AppsFlyer Debug: validateAndLogInAppPurchaseV2 called with purchaseType: %@, transactionId: %@, productId: %@", purchaseTypeString, transactionId, productId);
-        
-        // Call the actual AppsFlyer iOS V2 API
-        [self callAppsFlyerV2API:purchaseTypeString
-                   transactionId:transactionId
-                       productId:productId
-            additionalParameters:additionalParameters
-                          result:result];
-        
-    } @catch (NSException *exception) {
-        NSLog(@"AppsFlyer: Error in validateAndLogInAppPurchaseV2: %@", exception.reason);
-        result([FlutterError errorWithCode:@"VALIDATION_ERROR"
-                                   message:[NSString stringWithFormat:@"Purchase validation failed: %@", exception.reason]
-                                   details:nil]);
-    }
-}
-
-- (void)callAppsFlyerV2API:(NSString*)purchaseTypeString
-             transactionId:(NSString*)transactionId
-                 productId:(NSString*)productId
-      additionalParameters:(NSDictionary*)additionalParameters
-                    result:(FlutterResult)result {
+- (void)validateAndLogInAppPurchaseV2:(FlutterMethodCall*)call result:(FlutterResult)result {
+    NSDictionary* purchaseDetailsMap = call.arguments[@"purchaseDetails"];
+    NSDictionary* additionalParameters = call.arguments[@"additionalParameters"];
     
-    [[AppsFlyerLib shared] validateAndLogInAppPurchase:productId
-                                                 price:nil  // V2 doesn't use price
-                                              currency:nil  // V2 doesn't use currency
-                                         transactionId:transactionId
-                                  additionalParameters:additionalParameters
-                                               success:^(NSDictionary *response) {
-        NSLog(@"AppsFlyer Debug: validateAndLogInAppPurchaseV2 Success!");
-        // V2 API returns response directly without wrapper
-        NSMutableDictionary *v2Response = [NSMutableDictionary dictionaryWithDictionary:response];
-        v2Response[@"purchase_type"] = purchaseTypeString;
-        result(v2Response);
+    if (purchaseDetailsMap == nil) {
+        result([FlutterError errorWithCode:@"INVALID_ARGUMENTS"
+                                   message:@"Purchase details cannot be null"
+                                   details:nil]);
+        return;
     }
-                                               failure:^(NSError *error, id errorResponse) {
-        NSLog(@"AppsFlyer Debug: validateAndLogInAppPurchaseV2 failed with Error: %@", error);
-        
-        // Create error response for V2 format
-        NSMutableDictionary *errorData = [NSMutableDictionary dictionary];
+    
+    NSString* purchaseTypeString = purchaseDetailsMap[@"purchaseType"];
+    NSString* transactionId = purchaseDetailsMap[@"purchaseToken"]; // purchaseToken maps to transactionId on iOS
+    NSString* productId = purchaseDetailsMap[@"productId"];
+    
+    if (purchaseTypeString == nil || transactionId == nil || productId == nil) {
+        result([FlutterError errorWithCode:@"INVALID_ARGUMENTS"
+                                   message:@"Purchase details must contain purchaseType, purchaseToken, and productId"
+                                   details:nil]);
+        return;
+    }
+    
+    // Map Dart enum to iOS AFSDKPurchaseType
+    AFSDKPurchaseType purchaseType = [purchaseTypeString isEqualToString:@"subscription"]
+        ? AFSDKPurchaseTypeSubscription
+        : AFSDKPurchaseTypeOneTimePurchase;
+    
+    AFSDKPurchaseDetails *purchaseDetails = [[AFSDKPurchaseDetails alloc] initWithProductId:productId
+                                                                             transactionId:transactionId
+                                                                              purchaseType:purchaseType];
+    
+    // Handle NSNull for additionalParameters
+    NSDictionary* purchaseAdditionalDetails = [additionalParameters isEqual:[NSNull null]] ? nil : additionalParameters;
+    
+    [[AppsFlyerLib shared] validateAndLogInAppPurchase:purchaseDetails
+                             purchaseAdditionalDetails:purchaseAdditionalDetails
+                                            completion:^(NSDictionary * _Nullable response, NSError * _Nullable error) {
         if (error) {
-            errorData[@"error_message"] = error.localizedDescription ?: @"Purchase validation failed";
-            errorData[@"error_code"] = @(error.code);
-        }
-        if (errorResponse && [errorResponse isKindOfClass:[NSDictionary class]]) {
-            [errorData addEntriesFromDictionary:(NSDictionary*)errorResponse];
+            NSLog(@"AppsFlyer Debug: validateAndLogInAppPurchaseV2 failed: %@", error.localizedDescription);
+            result([FlutterError errorWithCode:@"VALIDATION_ERROR"
+                                       message:error.localizedDescription ?: @"Purchase validation failed"
+                                       details:@{
+                                           @"error_code": @(error.code),
+                                           @"error_domain": error.domain ?: @"Unknown"
+                                       }]);
+            return;
         }
         
-        result([FlutterError errorWithCode:@"VALIDATION_ERROR"
-                                   message:error.localizedDescription ?: @"Purchase validation failed"
-                                   details:errorData]);
+        NSLog(@"AppsFlyer Debug: validateAndLogInAppPurchaseV2 Success!");
+        result(response);
     }];
 }
 
@@ -834,6 +807,11 @@ static BOOL _isSKADEnabled = false;
         // isDebug is a boolean that will come through as an NSNumber
         isDebug = [(NSNumber*)isDebugValue boolValue];
     }
+
+    [AppsFlyerLib shared].appleAppID = appId;
+    [AppsFlyerLib shared].appsFlyerDevKey = devKey;
+    [AppsFlyerLib shared].isDebug = isDebug;
+
     isConversionDataValue = call.arguments[afConversionData];
     if ([isConversionDataValue isKindOfClass:[NSNumber class]]) {
         isConversionData = [(NSNumber*)isConversionDataValue boolValue];
@@ -877,10 +855,6 @@ static BOOL _isSKADEnabled = false;
     }
     
     [[AppsFlyerLib shared] setPluginInfoWith:AFSDKPluginFlutter pluginVersion:kAppsFlyerPluginVersion additionalParams:nil];
-    
-    [AppsFlyerLib shared].appleAppID = appId;
-    [AppsFlyerLib shared].appsFlyerDevKey = devKey;
-    [AppsFlyerLib shared].isDebug = isDebug;
     
     
     // SEL WaitForATTSel = NSSelectorFromString(@"waitForATTUserAuthorizationWithTimeoutInterval:");
@@ -934,9 +908,20 @@ static BOOL _isSKADEnabled = false;
 
 
 + (FlutterViewController*) getViewController{
-    UIViewController *topMostViewControllerObj =  [[[UIApplication sharedApplication] delegate] window].rootViewController;
+    UIWindow *window = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive) {
+                window = scene.windows.firstObject;
+                break;
+            }
+        }
+    }
+    if (window == nil) {
+        window = [[[UIApplication sharedApplication] delegate] window];
+    }
+    UIViewController *topMostViewControllerObj = window.rootViewController;
     FlutterViewController *flutterViewController = (FlutterViewController *)topMostViewControllerObj;
-    
     return flutterViewController;
 }
 
@@ -977,10 +962,52 @@ static BOOL _isSKADEnabled = false;
 // Open Universal Links
 - (BOOL)application:(UIApplication *)application continueUserActivity:(NSUserActivity *)userActivity restorationHandler:(void (^)(NSArray * _Nullable))restorationHandler {
     [[AppsFlyerAttribution shared] continueUserActivity:userActivity restorationHandler:restorationHandler];
-    
+
     // Results of this are ORed and NO doesn't affect other delegate interceptors' result.
     return NO;
 }
+
+#if __has_include(<Flutter/FlutterSceneLifeCycleDelegate.h>)
+#pragma mark - FlutterSceneLifeCycleDelegate
+
+// UIScene-based URI-scheme deep links (iOS 13+, Flutter 3.41+ UIScene migration)
+- (BOOL)scene:(UIScene*)scene openURLContexts:(NSSet<UIOpenURLContext*>*)URLContexts API_AVAILABLE(ios(13.0)) {
+    for (UIOpenURLContext *context in URLContexts) {
+        NSDictionary *opts = @{};
+        if (context.options.sourceApplication) {
+            opts = @{UIApplicationOpenURLOptionsSourceApplicationKey: context.options.sourceApplication};
+        }
+        [[AppsFlyerAttribution shared] handleOpenUrl:context.URL options:opts];
+    }
+    return NO;
+}
+
+// Cold-start deep links delivered via UISceneConnectionOptions (iOS 13+)
+// Handles both URI-scheme links (URLContexts) and Universal Links (userActivities)
+- (BOOL)scene:(UIScene*)scene
+    willConnectToSession:(UISceneSession*)session
+                 options:(UISceneConnectionOptions*)connectionOptions API_AVAILABLE(ios(13.0)) {
+    for (UIOpenURLContext *context in connectionOptions.URLContexts) {
+        NSDictionary *opts = @{};
+        if (context.options.sourceApplication) {
+            opts = @{UIApplicationOpenURLOptionsSourceApplicationKey: context.options.sourceApplication};
+        }
+        [[AppsFlyerAttribution shared] handleOpenUrl:context.URL options:opts];
+    }
+    for (NSUserActivity *activity in connectionOptions.userActivities) {
+        if ([activity.activityType isEqualToString:NSUserActivityTypeBrowsingWeb]) {
+            [[AppsFlyerAttribution shared] continueUserActivity:activity restorationHandler:nil];
+        }
+    }
+    return NO;
+}
+
+// UIScene-based Universal Links (iOS 13+)
+- (BOOL)scene:(UIScene*)scene continueUserActivity:(NSUserActivity*)userActivity API_AVAILABLE(ios(13.0)) {
+    [[AppsFlyerAttribution shared] continueUserActivity:userActivity restorationHandler:nil];
+    return NO;
+}
+#endif // __has_include(<Flutter/FlutterSceneLifeCycleDelegate.h>)
 
 
 @end

@@ -1,5 +1,31 @@
 # Versions
 
+## 6.17.9
+
+- Added UIScene lifecycle support for iOS deep linking (Flutter 3.41+ compatibility)
+  - Adopted `FlutterSceneLifeCycleDelegate` with compile-time guard for backward compatibility
+  - Added `scene:openURLContexts:` for warm-start URI-scheme deep links
+  - Added `scene:willConnectToSession:options:` for cold-start URI-scheme and Universal Links
+  - Added `scene:continueUserActivity:` for Universal Links via UIScene
+- Fixed `getViewController` to use `UIWindowScene` lookup on iOS 13+ (replaces deprecated `UIApplication.delegate.window`)
+- Updated iOS SDK from 6.17.8 to 6.17.9
+- Updated iOS Purchase Connector from 6.17.8 to 6.17.9
+
+## 6.17.8
+
+- Updated Android SDK from 6.17.4 to 6.17.5
+- Updated iOS SDK from 6.17.7 to 6.17.8
+- Updated iOS Purchase Connector from 6.17.7 to 6.17.8
+- Deprecated `validateAndLogInAppAndroidPurchase` (V1) - use `validateAndLogInAppPurchaseV2` instead
+- Deprecated `validateAndLogInAppIosPurchase` (V1) - use `validateAndLogInAppPurchaseV2` instead
+- Enhanced iOS error handling for `validateAndLogInAppPurchaseV2` with comprehensive NSError parsing (code, domain, userInfo)
+- **Documentation Updates:**
+  - Removed "Beta" label from `validateAndLogInAppPurchaseV2` API
+  - Marked V1 purchase validation APIs as Deprecated
+  - Added comprehensive `PlatformException` error handling examples for V2 API
+  - Added iOS token format explanation for uninstall measurement
+  - Added cross-platform Firebase Messaging example for uninstall tokens
+
 ## 6.17.7+1
 
 - Update Android SDK version to 6.17.4
